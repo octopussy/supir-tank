@@ -100,7 +100,7 @@ struct FTankTransmissionData
 };
 
 UCLASS()
-class ENGINE_API UWheeledVehicleMovementComponentTank : public UWheeledVehicleMovementComponent {
+class SUPIRTANK_API UWheeledVehicleMovementComponentTank : public UWheeledVehicleMovementComponent {
     GENERATED_UCLASS_BODY()
 
 public:
