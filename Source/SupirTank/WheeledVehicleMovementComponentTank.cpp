@@ -220,9 +220,9 @@ void UWheeledVehicleMovementComponentTank::UpdateSimulation(float DeltaTime) {
     VehicleInputData.setAnalogLeftBrake(leftBrake);
     VehicleInputData.setAnalogRightBrake(rightBrake);
 
-    print(FString::Printf(TEXT("g: (%d %d)\t s:%03.2f\t t: %03.2f\t l: %03.2f\t r: %03.2f\t lb: %03.2f\t rb: %03.2f"),
-                          GetCurrentGear(), GetTargetGear(), GetForwardSpeed(),
-                          throttle, leftThrust, rightThrust, leftBrake, rightBrake));
+   // print(FString::Printf(TEXT("g: (%d %d)\t s:%03.2f\t t: %03.2f\t l: %03.2f\t r: %03.2f\t lb: %03.2f\t rb: %03.2f"),
+   //                       GetCurrentGear(), GetTargetGear(), GetForwardSpeed(),
+   //                       throttle, leftThrust, rightThrust, leftBrake, rightBrake));
 
     if (!PVehicleDrive->mDriveDynData.getUseAutoGears()) {
         VehicleInputData.setGearUp(bRawGearUpInput);
