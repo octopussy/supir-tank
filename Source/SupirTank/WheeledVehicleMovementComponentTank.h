@@ -11,7 +11,13 @@ struct FTankEngineData
 
     /** Torque (Nm) at a given RPM*/
     UPROPERTY(EditAnywhere, Category = Setup)
-            FRuntimeFloatCurve TorqueCurve;
+    float Torque0;
+    UPROPERTY(EditAnywhere, Category = Setup)
+    float Torque25;
+    UPROPERTY(EditAnywhere, Category = Setup)
+    float Torque75;
+    UPROPERTY(EditAnywhere, Category = Setup)
+    float Torque100;
 
     /** Maximum revolutions per minute of the engine */
     UPROPERTY(EditAnywhere, Category = Setup, meta = (ClampMin = "0.01", UIMin = "0.01"))
@@ -155,4 +161,9 @@ protected:
     UPROPERTY(Transient)
     float RightThrust;
 
+public:
+    virtual void PreTick(float DeltaTime) override;
+
+protected:
+    virtual float CalcThrottleInput() override;
 };

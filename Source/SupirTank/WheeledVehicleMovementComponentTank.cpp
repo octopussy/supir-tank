@@ -1,7 +1,7 @@
 #include "SupirTank.h"
 #include "WheeledVehicleMovementComponentTank.h"
-#include "PhysicsPublic.h"
 
+#include "PhysicsPublic.h"
 #include "PhysXPublic.h"
 
 
@@ -26,13 +26,10 @@ UWheeledVehicleMovementComponentTank::UWheeledVehicleMovementComponentTank(const
     EngineSetup.DampingRateZeroThrottleClutchEngaged = DefEngineData.mDampingRateZeroThrottleClutchEngaged;
     EngineSetup.DampingRateZeroThrottleClutchDisengaged = DefEngineData.mDampingRateZeroThrottleClutchDisengaged;
 
-    // Convert from PhysX curve to ours
-    FRichCurve *TorqueCurveData = EngineSetup.TorqueCurve.GetRichCurve();
-    for (PxU32 KeyIdx = 0; KeyIdx < DefEngineData.mTorqueCurve.getNbDataPairs(); KeyIdx++) {
-        float Input = DefEngineData.mTorqueCurve.getX(KeyIdx) * EngineSetup.MaxRPM;
-        float Output = DefEngineData.mTorqueCurve.getY(KeyIdx) * DefEngineData.mPeakTorque;
-        TorqueCurveData->AddKey(Input, Output);
-    }
+    EngineSetup.Torque0 = 400.f;
+    EngineSetup.Torque25 = 500.f;
+    EngineSetup.Torque75 = 600.f;
+    EngineSetup.Torque100 = 400.f;
 
     PxVehicleClutchData DefClutchData;
     TransmissionSetup.ClutchStrength = DefClutchData.mStrength;
@@ -59,18 +56,8 @@ UWheeledVehicleMovementComponentTank::UWheeledVehicleMovementComponentTank(const
 }
 
 
-
-float FTankEngineData::FindPeakTorque() const
-{
-	// Find max torque
-	float PeakTorque = 0.f;
-	TArray<FRichCurveKey> TorqueKeys = TorqueCurve.GetRichCurveConst()->GetCopyOfKeys();
-	for (int32 KeyIdx = 0; KeyIdx < TorqueKeys.Num(); KeyIdx++)
-	{
-		FRichCurveKey& Key = TorqueKeys[KeyIdx];
-		PeakTorque = FMath::Max(PeakTorque, Key.Value);
-	}
-	return PeakTorque;
+float FTankEngineData::FindPeakTorque() const {
+    return FMath::Max3(Torque0, Torque25, FMath::Max(Torque75, Torque100));
 }
 
 static void GetTankVehicleEngineSetup(const FTankEngineData &Setup, PxVehicleEngineData &PxSetup) {
@@ -85,14 +72,10 @@ static void GetTankVehicleEngineSetup(const FTankEngineData &Setup, PxVehicleEng
 
     // Convert from our curve to PhysX
     PxSetup.mTorqueCurve.clear();
-    TArray<FRichCurveKey> TorqueKeys = Setup.TorqueCurve.GetRichCurveConst()->GetCopyOfKeys();
-    int32 NumTorqueCurveKeys = FMath::Min<int32>(TorqueKeys.Num(),
-                                                 PxVehicleEngineData::eMAX_NB_ENGINE_TORQUE_CURVE_ENTRIES);
-    for (int32 KeyIdx = 0; KeyIdx < NumTorqueCurveKeys; KeyIdx++) {
-        FRichCurveKey &Key = TorqueKeys[KeyIdx];
-        PxSetup.mTorqueCurve.addPair(FMath::Clamp(Key.Time / Setup.MaxRPM, 0.f, 1.f),
-                                     Key.Value / PeakTorque); // Normalize torque to 0-1 range
-    }
+    PxSetup.mTorqueCurve.addPair(0.f, Setup.Torque0 / PeakTorque);
+    PxSetup.mTorqueCurve.addPair(0.25f, Setup.Torque25 / PeakTorque);
+    PxSetup.mTorqueCurve.addPair(0.75f, Setup.Torque75 / PeakTorque);
+    PxSetup.mTorqueCurve.addPair(1.f, Setup.Torque100 / PeakTorque);
 }
 
 static void GetTankVehicleGearSetup(const FTankTransmissionData &Setup, PxVehicleGearsData &PxSetup) {
@@ -116,8 +99,7 @@ static void GetTankVehicleAutoBoxSetup(const FTankTransmissionData &Setup, PxVeh
 }
 
 void SetupTankDriveHelper(const UWheeledVehicleMovementComponentTank *VehicleData,
-                          const PxVehicleWheelsSimData *PWheelsSimData, PxVehicleDriveSimData4W &DriveData,
-                          uint32 NumOfWheels) {
+                          PxVehicleDriveSimData &DriveData) {
 
 
     PxVehicleEngineData EngineSetup;
@@ -168,26 +150,50 @@ void UWheeledVehicleMovementComponentTank::SetupVehicle() {
     SetupWheels(PWheelsSimData);
 
     // Setup drive data
-    PxVehicleDriveSimData4W DriveData;
-    SetupTankDriveHelper(this, PWheelsSimData, DriveData, WheelSetups.Num());
+    PxVehicleDriveSimData DriveData;
+    SetupTankDriveHelper(this, DriveData);
 
     // Create the vehicle
     PxVehicleDriveTank *PVehicleDriveTank = PxVehicleDriveTank::allocate(WheelSetups.Num());
     check(PVehicleDriveTank);
 
-    PVehicleDriveTank->setup(GPhysXSDK, UpdatedPrimitive->GetBodyInstance()->GetPxRigidDynamic_AssumesLocked(), *PWheelsSimData,
+    PVehicleDriveTank->setup(GPhysXSDK, UpdatedPrimitive->GetBodyInstance()->GetPxRigidDynamic_AssumesLocked(),
+                             *PWheelsSimData,
                              DriveData, WheelSetups.Num());
+
     PVehicleDriveTank->setToRestState();
+
+    PVehicleDriveTank->mDriveDynData.forceGearChange(PxVehicleGearsData::eFIRST);
 
     // cleanup
     PWheelsSimData->free();
-    PWheelsSimData = NULL;
 
     // cache values
     PVehicle = PVehicleDriveTank;
     PVehicleDrive = PVehicleDriveTank;
 
+    PxVehicleChassisData d;
+
     SetUseAutoGears(TransmissionSetup.bUseGearAutoBox);
+}
+
+
+void UWheeledVehicleMovementComponentTank::PreTick(float DeltaTime) {
+    UWheeledVehicleMovementComponent::PreTick(DeltaTime);
+}
+
+
+float UWheeledVehicleMovementComponentTank::CalcThrottleInput() {
+    if (FMath::Abs(RawSteeringInput) > 0 && FMath::Abs(RawThrottleInput) <= 0.1f) {
+        if (GetCurrentGear() > 0 && GetTargetGear() > 0) {
+            SetTargetGear(1, true);
+        } else if (GetCurrentGear() < 0 && GetTargetGear() < 0) {
+            SetTargetGear(-1, true);
+        }
+
+        RawThrottleInput = FMath::Abs(RawSteeringInput);
+    }
+    return UWheeledVehicleMovementComponent::CalcThrottleInput();
 }
 
 void UWheeledVehicleMovementComponentTank::UpdateSimulation(float DeltaTime) {
@@ -197,20 +203,26 @@ void UWheeledVehicleMovementComponentTank::UpdateSimulation(float DeltaTime) {
 
     PxVehicleDriveTankRawInputData VehicleInputData(PxVehicleDriveTankControlModel::Enum::eSTANDARD);
 
-    float scaledSteering = SteeringInput * 100;
-    float scaledThrottle = ThrottleInput * 100;
-    float invSteering = -scaledSteering;
-    float v = (100 - FMath::Abs(invSteering)) * (scaledThrottle / 100) + scaledThrottle;
-    float w = (100 - FMath::Abs(scaledThrottle)) * (invSteering / 100) + invSteering;
-    float r = (v + w) / 2.f;
-    float l = (v - w) / 2.f;
+    float leftThrust = FMath::Clamp(1.f + SteeringInput, 0.f, 1.f);
+    float rightThrust = FMath::Clamp(1.f - SteeringInput, 0.f, 1.f);
+    float MAX_SPEED = 1000.f;
+    float speedScale =
+            FMath::Clamp(((MAX_SPEED - FMath::Abs(GetForwardSpeed())) / MAX_SPEED), 0.f, 1.f) * (1.f - ThrottleInput) *
+            0.7f;
+    float leftBrake = FMath::Max(BrakeInput, rightThrust * 0.7f);
+    float rightBrake = FMath::Max(BrakeInput, leftThrust * 0.7f);
+    float throttle = FMath::Max(ThrottleInput, FMath::Abs(SteeringInput));
 
-    VehicleInputData.setAnalogAccel(ThrottleInput);
+    VehicleInputData.setAnalogAccel(throttle);
 
-    VehicleInputData.setAnalogLeftThrust(l / 100.f);
-    VehicleInputData.setAnalogRightThrust(r / 100.f);
-    VehicleInputData.setAnalogLeftBrake(BrakeInput);
-    VehicleInputData.setAnalogRightBrake(BrakeInput);
+    VehicleInputData.setAnalogLeftThrust(BrakeInput  <= 0.1f ? leftThrust: 0.f);
+    VehicleInputData.setAnalogRightThrust(BrakeInput  <= 0.1f ? rightThrust : 0.f);
+    VehicleInputData.setAnalogLeftBrake(leftBrake);
+    VehicleInputData.setAnalogRightBrake(rightBrake);
+
+    print(FString::Printf(TEXT("g: (%d %d)\t s:%03.2f\t t: %03.2f\t l: %03.2f\t r: %03.2f\t lb: %03.2f\t rb: %03.2f"),
+                          GetCurrentGear(), GetTargetGear(), GetForwardSpeed(),
+                          throttle, leftThrust, rightThrust, leftBrake, rightBrake));
 
     if (!PVehicleDrive->mDriveDynData.getUseAutoGears()) {
         VehicleInputData.setGearUp(bRawGearUpInput);

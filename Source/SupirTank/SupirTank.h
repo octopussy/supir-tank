@@ -3,7 +3,9 @@
 #ifndef __SUPIRTANK_H__
 #define __SUPIRTANK_H__
 
-#include "EngineMinimal.h"
+#include "Engine.h"
+
+#include "EngineGlobals.h"
 
 #include "PxPhysicsAPI.h"
 #include "PxAllocatorCallback.h"
@@ -11,6 +13,8 @@
 
 #include "WheeledVehicleMovementComponentTank.h"
 #include "SupirTankClasses.h"
+
+#define print(text) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 20, FColor::White,text)
 
 //////////////////////////////////////////////////////
 // for PhysX mem allocation purposes : consider this as hack!!
