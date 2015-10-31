@@ -8,6 +8,8 @@
 UWheeledVehicleMovementComponentTank::UWheeledVehicleMovementComponentTank(const FObjectInitializer &ObjectInitializer)
         : Super(ObjectInitializer) {
 
+    ensurePhysXFoundationSetup();
+
     RightThrustRate.FallRate = 5.f;
     RightThrustRate.RiseRate = 2.5f;
     LeftThrustRate.FallRate = 5.f;

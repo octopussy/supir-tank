@@ -12391,9 +12391,12 @@ set(CONFIG_FILES
 
 include_directories(
         "${GAME_SOURCE_ROOT_PATH}"
-        
+
+        "${GAME_ROOT_PATH}/Intermediate/Build/Mac/UE4Editor/Inc/${PROJECT_NAME}"
+        "${GAME_ROOT_PATH}/Intermediate/Build/Win64/UE4Editor/Inc/${PROJECT_NAME}"
+#[[
         "${UE4_ROOT_PATH}/Engine/Intermediate/Build/Mac/${PROJECT_NAME}/Inc/${PROJECT_NAME}"
-        "${UE4_ROOT_PATH}/Engine/Intermediate/Build/Win64/${PROJECT_NAME}/Inc/${PROJECT_NAME}"
+        "${UE4_ROOT_PATH}/Engine/Intermediate/Build/Win64/${PROJECT_NAME}/Inc/${PROJECT_NAME}"]]
 
         "${UE4_ROOT_PATH}/Engine/Source/Runtime/AnimGraphRuntime/Public"
         "${UE4_ROOT_PATH}/Engine/Source/Runtime/AnimGraphRuntime/Public/BoneControllers"
